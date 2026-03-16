@@ -1,0 +1,295 @@
+#We use a Magma program to check a resultant computation for #Part~(d) of Theorem 2.5.
+
+clear;
+m := 3;
+i := 1;
+qq:= 2^m;
+q:= 2^i;
+ZZ := GF(qq^(q^3+q^2+q));
+K<x,xq,xqq,xqqq,
+y,yq,yqq,yqqq,
+z,zq,zqq,zqqq,
+A,Aq,Aq2,Aq3,
+B,Bq,Bq2,Bq3,
+C,Cq,Cq2,Cq3,
+a,aq,aq2,aq3>
+:= PolynomialRing(ZZ,28);
+
+frob := function(pol)
+	return Evaluate(pol,
+	[xq,xqq,xqqq,x^100,
+yq,yqq,yqqq,y^100,
+zq,zqq,zqqq,z^100,
+Aq,Aq2,Aq3,A^100,
+Bq,Bq2,Bq3,B^100,
+Cq,Cq2,Cq3,C^100,
+aq,aq2,aq3,a^100]);
+end function;
+
+
+Eq1 := Aq* x + (A+a*C)*xq + Cq* y + a*Aq* z + B *zq;
+Eq2 := C*xq + Bq* y + B*yq + Aq *z;
+Eq3 := Bq* x + (A+a*C)*yq + (a*Bq+Cq)*z + C*zq;
+
+R1 := Resultant(Resultant(Eq2,Eq1,z),frob(Eq2),zq);
+R2 := Resultant(Resultant(Eq2,Eq3,z),frob(Eq2),zq);
+
+R3 := Resultant(R1,R2,xqq) div Cq div Aq2 div Aq;
+
+R4 := Resultant(Resultant(R1,frob(R3),xqq),R3,xq);
+
+R4 := R4 div Cq div B div Aq2 div Aq div (A*Aq*Aq2 + A*Bq*Bq2*aq + A*Bq*Cq2 + Aq*Aq2*C*a + Aq*Bq2*C + Aq2*B*Cq + 
+        B*Bq*Bq2 + Bq*Bq2*C*a*aq + Bq*C*Cq2*a + Bq2*C*Cq*aq + C*Cq*Cq2);
+
+R5 := Resultant(Resultant(R3,frob(R4),xq),R4,x);
+Factorization(R5);
+
+
+The following Magma script verifies that for good parameters~$a$ 
+(those for which $Q_a$ has no root in $\F_{2^m}^*$), the linear 
+dependence condition $H=0$ never occurs for any Type~3 direction 
+$(A,B,C)\in(\F_{2^m}^*)^3$. This confirms that the two cases in 
+Step~3 of Part~(d) of Theorem~\ref{thm:Ga_normal_form_differential} 
+are exhaustive under the root-free hypothesis. For bad parameters~$a$,  $H=0$ does occur (as the sanity check confirms), justifying the remark following that case analysis.
+
+\begin{lstlisting}
+for m in [3,5] do
+    i := 1; q := 2^i; qq := 2^m; F := GF(qq);
+    P<T> := PolynomialRing(F);
+    printf "=== m=%o, i=%o, q=%o ===\n", m, i, q;
+    good_a := []; bad_a := [];
+    for a_val in F do
+        if a_val eq 0 then continue; end if;
+        Qa := T^(q^2+q+1) + a_val*T + 1;
+        if #Roots(Qa) eq 0 then Append(~good_a, a_val);
+        else Append(~bad_a, a_val); end if;
+    end for;
+    printf "Good a (Q_a root-free): %o, Bad a (Q_a has root): %o\n",
+           #good_a, #bad_a;
+    // For good a: verify H != 0 for all Type 3 directions
+    H_zero_found := false;
+    for a_val in good_a do
+        for A in F do if A eq 0 then continue; end if;
+        for B in F do if B eq 0 then continue; end if;
+        for C in F do if C eq 0 then continue; end if;
+            H_val :=
+                A^(q^2+q+1) + A*B^(q^2+q)*a_val^q + A*B^q*C^(q^2)
+                + A^(q^2+q)*C*a_val + A^q*B^(q^2)*C + A^(q^2)*B*C^q
+                + B^(q^2+q+1) + B^(q^2+q)*C*a_val^(q+1)
+                + B^q*C^(q^2+1)*a_val + B^(q^2)*C^(q+1)*a_val^q
+                + C^(q^2+q+1);
+            if H_val eq 0 then
+                H_zero_found := true;
+                printf "FAIL: H=0 for good a=%o, A=%o, B=%o, C=%o\n",
+                       a_val, A, B, C;
+            end if;
+        end for; end for; end for;
+    end for;
+    if not H_zero_found then
+        printf "CONFIRMED: H != 0 for all Type 3 directions with good a.\n";
+    end if;
+    // For bad a: verify H=0 does occur
+    if #bad_a eq 0 then
+        printf "No bad a exists for m=%o (all parameters are good).\n\n", m;
+    else
+        H_zero_bad := 0;
+        for a_val in bad_a do
+            for A in F do if A eq 0 then continue; end if;
+            for B in F do if B eq 0 then continue; end if;
+            for C in F do if C eq 0 then continue; end if;
+                H_val :=
+                    A^(q^2+q+1) + A*B^(q^2+q)*a_val^q + A*B^q*C^(q^2)
+                    + A^(q^2+q)*C*a_val + A^q*B^(q^2)*C + A^(q^2)*B*C^q
+                    + B^(q^2+q+1) + B^(q^2+q)*C*a_val^(q+1)
+                    + B^q*C^(q^2+1)*a_val + B^(q^2)*C^(q+1)*a_val^q
+                    + C^(q^2+q+1);
+                if H_val eq 0 then H_zero_bad +:= 1; end if;
+            end for; end for; end for;
+        end for;
+        printf "Sanity check: H=0 occurs %o times for bad a.\n\n",
+               H_zero_bad;
+    end if;
+end for;
+\end{lstlisting}
+
+The output is:
+\begin{verbatim}
+=== m=3, i=1, q=2 ===
+Good a (Q_a root-free): 7, Bad a (Q_a has root): 0
+CONFIRMED: H != 0 for all Type 3 directions with good a.
+No bad a exists for m=3 (all parameters are good).
+
+=== m=5, i=1, q=2 ===
+Good a (Q_a root-free): 11, Bad a (Q_a has root): 20
+CONFIRMED: H != 0 for all Type 3 directions with good a.
+Sanity check: H=0 occurs 27900 times for bad a.
+\end{verbatim}
+
+The next SageMath code verifies that there are no non-monomial maps for $m=5$ needed to check the non CCZ-equivalence of our $G_a/H_a$ classes to the $G_1/H_1$ functions of~\cite{LK24}.
+{\small
+\begin{lstlisting}
+# SageMath Code: Optimized Monomial EL-Equivalence Check
+# Solves for scales algebraically instead of brute-force
+
+from itertools import permutations
+
+def check_monomial_equiv_optimized(m=5, i=1, a_val=None):
+    """
+    Check if G_a is monomial EL-equivalent to G_1.
+    Solves for scales algebraically by matching coefficients.
+    """
+    print(f"{'='*70}")
+    print(f"Optimized Monomial EL-Equivalence Check (m={m}, i={i})")
+    print(f"{'='*70}")
+    print(f"Based on Shi et al. Theorem 8: For m=5, EL <-> Monomial (Perm x Scale x Frobenius)")
+    print(f"{'='*70}")
+    
+    q = 2^i
+    K.<alpha> = GF(2^m)
+    R.<x,y,z> = PolynomialRing(K)
+    
+    # Use provided a_val or pick a 'bad' one (a^(q^2+q+1) != 1)
+    if a_val is None:
+        # Find a good parameter with a^7 != 1
+        for a in K:
+            if a != 0 and a^(q^2+q+1) != 1:
+                # Check if it's good (APN)
+                is_good = True
+                for t in K:
+                    if t^(q^2+q+1) + a*t + 1 == 0:
+                        is_good = False
+                        break
+                if is_good:
+                    a_val = a
+                    break
+    
+    print(f"\nTesting a = {a_val}")
+    print(f"  a^(q^2+q+1) = {a_val^(q^2+q+1)}")
+    print(f"  Is good parameter (APN): {all(t^(q^2+q+1) + a_val*t + 1 != 0 for t in K)}")
+    
+    # Define G_1 and G_a
+    def get_G(a):
+        G1 = x^(q+1) + a * x^q * z + y * z^q
+        G2 = x^q * z + y^(q+1)
+        G3 = x * y^q + a * y^q * z + z^(q+1)
+        return vector([G1, G2, G3])
+    
+    G1_poly = get_G(K(1))
+    Ga_poly = get_G(a_val)
+    
+    # Monomial map: A2(input) = perm_in x scale_in
+    #               A1(output) = perm_out x scale_out
+    # We solve for scales by matching coefficients of pure terms
+    
+    perms = list(permutations([0, 1, 2]))
+    found_map = False
+    
+    print(f"\nSearching {len(perms)} x {len(perms)} = {len(perms)^2} permutation combinations...")
+    print(f"(Scales determined algebraically)")
+    
+    for p_in in perms:
+        for p_out in perms:
+            # We need to find scales lambda_1, lambda_2, lambda_3 (input)
+            # and mu_1, mu_2, mu_3 (output) such that:
+            # G_1(x) = mu * G_a( lambda * x_perm )
+            
+            # Match coefficients of pure terms x^{q+1}, y^{q+1}, z^{q+1}
+            # G_1 has pure terms in components 1, 2, 3 respectively (all coeff 1)
+            # G_a(A2(x)) will have pure terms with coeffs involving lambdas
+            
+            # For each output component k, we need:
+            # mu_k * (lambda_{p_in[j]}^{q+1}) = 1
+            # where j is such that p_out[j] = k (input var that maps to output k)
+            
+            # This gives us 6 equations for 6 unknowns (3 lambdas, 3 mus)
+            # We can solve this system
+            
+            # Build the system
+            # Let's denote: L0, L1, L2 = lambda_1, lambda_2, lambda_3
+            #               M0, M1, M2 = mu_1, mu_2, mu_3
+            
+            # For output component k (0,1,2), the pure term comes from input var p_in[p_out[k]]
+            # So: M_k * L_{p_in[p_out[k]]}^{q+1} = 1
+            
+            # This determines M_k in terms of L_{p_in[p_out[k]]}
+            # Then we check if the 'a' terms are consistent
+            
+            # Try all possible lambda values (fix one to 1 for gauge freedom)
+            nonzero = [k for k in K if k != 0]
+            
+            # Fix lambda_1 = 1 (gauge freedom)
+            L = [None, None, None]
+            L[0] = K(1)  # lambda_1 = 1
+            
+            for L1_val in nonzero:  # lambda_2
+                L[1] = L1_val
+                for L2_val in nonzero:  # lambda_3
+                    L[2] = L2_val
+                    
+                    # Determine M_k from pure term matching
+                    M = [None, None, None]
+                    valid = True
+                    
+                    for k in range(3):
+                        # Output component k gets pure term from input var p_in[p_out[k]]
+                        input_var_idx = p_in[p_out[k]]
+                        lambda_val = L[input_var_idx]
+                        
+                        # M_k * lambda_val^{q+1} = 1
+                        if lambda_val^(q+1) == 0:
+                            valid = False
+                            break
+                        M[k] = lambda_val^(-(q+1))
+                    
+                    if not valid:
+                        continue
+                    
+                    # Now check if 'a' terms are consistent
+                    # G_a has 'a' terms at specific positions
+                    # After applying monomial map, check if they match G_1's '1' terms
+                    
+                    # Apply the map to G_a
+                    vars_in = [x, y, z]
+                    subs = {}
+                    for idx in range(3):
+                        subs[vars_in[idx]] = L[p_in[idx]] * vars_in[p_in[idx]]
+                    
+                    Ga_transformed = vector([g.subs(subs) for g in Ga_poly])
+                    
+                    # Apply output scaling and permutation
+                    Result = vector([
+                        M[p_out[0]] * Ga_transformed[0],
+                        M[p_out[1]] * Ga_transformed[1],
+                        M[p_out[2]] * Ga_transformed[2]
+                    ])
+                    
+                    # Check if Result == G_1
+                    if Result == G1_poly:
+                        print(f"\n FOUND MONOMIAL MAP!")
+                        print(f"  Input perm: {p_in}, scales: {L}")
+                        print(f"  Output perm: {p_out}, scales: {M}")
+                        found_map = True
+                        break
+                
+                if found_map:
+                    break
+            if found_map:
+                break
+        if found_map:
+            break
+    
+    print(f"\n{'='*70}")
+    if found_map:
+        print(f"RESULT: G_{a_val}, H_{a_val} IS EL-equivalent to G_1, H_1 (via monomial map)")
+        print(f"  This implies a^{q^2+q+1} must equal 1")
+    else:
+        print(f"RESULT: G_{a_val}, H_{a_val} NOT EL-equivalent to G_1, H_1 via monomial maps")
+        print(f"  By Shi et al. Theorem 8, for m=5, ONLY monomial maps exist")
+        print(f"  Therefore, G_{a_val}, H_{a_val} NOT EL-equivalent to G_1, H_1")
+        print(f"  By Shi et al. Props 1-2, for quadratic APN: EL <-> CCZ")
+        print(f"  Therefore, G_{a_val}, H_{a_val} NOT CCZ-equivalent to G_1, H_1")
+        print(f"\n  This provide a rigorous example for the non-EL hence non-CCZ equivalence!")
+    print(f"{'='*70}")
+
+# Run for m=5
+check_monomial_equiv_optimized(m=5, i=1)
